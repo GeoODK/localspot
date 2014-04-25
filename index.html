@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>A Local Spot</title>
+        <link rel="apple-touch-icon" href="/images/logo2_web.png"/>
+		<link rel="apple-touch-icon-precomposed" href="/images/logo2_web.png"/>
+        <link rel="shortcut icon" href="images/geoodk_fav.ico">
+		<link rel="stylesheet" href="themes/geoodk.min.css" />
+        <link rel="stylesheet" href="css/mystyles.css">
+		<link rel="stylesheet" href="css/jquery.mobile.structure-1.3.2.min.css" />
+		<script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+		<script src="http://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.js"></script>
+            <script type="text/javascript"
+			  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyADr0YDZAqzs1biYk0uBdiVPEXLsmBtiRg&sensor=true">
+			</script>
+        
+        <script>
+		
+			var geocoder;
+			var currentLocation;
+			var searchResults;
+			
+			var map;
+			var map2;
+			var map3;
+			var marker;
+			var directionsDisplay;
+			var directionService;
+			var window_height;
+			var window_width;
+
+		
+		 function setlocation(loc){
+				geocoder.geocode({'location':loc},function (results,status){
+					if(status == google.maps.GeocoderStatus.OK){						
+						if(results[0]){							
+							$("#lat").attr("value",parseFloat(loc.lat().toFixed(6)));
+							$("#lng").attr("value",parseFloat(loc.lng().toFixed(6)));							
+							$("#address").attr("value",results[0].formatted_address);							
+						}else{
+							alert("not results found" );
+						}						
+					}else{
+						$('#address').html("Geocoder Failed due to: "+ status);	
+					}
+				});
+					
+			}
+			function showLocation(location){
+				geocoder = new google.maps.Geocoder();
+				currentLocation = new google.maps.LatLng(location.coords.latitude,location.coords.longitude);
+				setlocation(currentLocation);				
+				if(!map)initMap();
+		     
+	      	}
+			function showLocation_mobile(){
+				geocoder = new google.maps.Geocoder();
+				currentLocation = new google.maps.LatLng(38.987827,-76.942801);
+				setlocation(currentLocation);				
+				if(!map)initMap();
+		     
+	      	}
+	      	
+
+			function initMap(){
+				setlocation(currentLocation);
+				//directionsDisplay = new google.maps.DirectionsRenderer();
+				//directionService = new google.maps.DirectionsService();
+				//var myLatlng = new google.maps.LatLng(-25.363882,131.044922);
+				
+				var bounds = new google.maps.LatLngBounds();
+                bounds.extend(currentLocation);
+               // bounds.extend(faciLocation);                        
+
+				var mapOptions = {
+					zoom:14,
+					mapTypeId: google.maps.MapTypeId.ROADMAP,
+					center: currentLocation
+				}
+				
+				
+
+				map = new google.maps.Map(document.getElementById('mapDiv'),mapOptions);
+				  marker = new google.maps.Marker({
+					map:map,
+					draggable:true,
+					animation: google.maps.Animation.DROP,
+					position: currentLocation
+				  });
+
+				google.maps.event.addListenerOnce(map, 'idle', function() {	
+					google.maps.event.trigger(map, 'resize');
+					map.fitBounds(bounds);	
+					map.setZoom(14);	
+				});
+				google.maps.event.addListener(marker, 'dragend',change_lat_lng);
+				  google.maps.event.addListener(map, 'dragend',change_marker_tocenter_map);
+
+				 
+			}
+			function change_marker_tocenter_map(){
+					marker.setPosition(map.getCenter());
+					setlocation(marker.getPosition());
+			}
+			function change_lat_lng(){
+				setlocation(this.getPosition());
+				$("#lat").attr("value",parseFloat(this.getPosition().lat().toFixed(6)));
+				$("#lng").attr("value",parseFloat(this.getPosition().lng().toFixed(6)));
+				map.setCenter(this.getPosition());
+			}
+			
+			function validateFormOnSubmit(){
+				var category = $('#category').val();
+				var othercat = $('#other_cat').val();
+				var lat = $('#lat').val();
+				var lng = $('#lng').val();
+				var address = $('#address').val();
+				var description = $('#description').val();
+				var title = $('#title').val();
+				var error;
+				if (category == 'none'){
+					//alert('No Category Selected');
+					error = true;
+				}
+				if(lat=='' || lng == '' ||description==''){
+					error = true;
+				}
+				if ((category=='Other')&&(othercat == '')){
+					error = true
+				}
+				
+				if ((category=='Other')&&(othercat != '')){
+					category = othercat;
+				}
+				
+				if (error == true){
+					alert('Required no Filled Out');	
+				}else{
+					parm = {
+							lat:lat,
+							lng:lng,
+							address:address,
+							category:category,
+							description:description,
+							title:title				
+							
+					}
+					$.post( "submit.php",parm, function( data ) {
+					  	alert(data);
+						$('#insertForm').trigger("reset");
+						updatespots();
+						$.mobile.changePage('#search');
+					});
+					
+				}
+				
+				
+			}
+			
+			function listspots(data){
+				$("#searchResults li").remove();
+				var cats = ['Bar','Restaurant','Park','Business','Monument','Museum','Music','Other'];
+				for(var list = 0;list < cats.length;list++){
+					var list_devider = cats[list];
+					var devider = $("<li data-role='list-divider'>").html(list_devider);
+					$("#searchResults").append(devider);
+					$(data).find('spot').each(function(){
+						var content= '';
+						var lat = $(this).find("lat").text();
+						var lng = $(this).find("lng").text();
+						var address = $(this).find("address").text();
+						var category = $(this).find("category").text();
+						var description = $(this).find("description").text();
+						var date = $(this).find("date").text();
+						var title = $(this).find("title").text();
+						
+						if (category ==list_devider){
+							content +='<a href="#searchMap"  onclick="searchSpotMap(\''+title+'\',\''+date+'\',\''+description+'\',\''+lat+'\',\''+lng+'\')">'+title+": "+description + "</a>";
+							var resultItem = $("<li>").html(content);
+							$("#searchResults").append(resultItem);
+						}else if ((list_devider =='Other')&& (jQuery.inArray( category, cats )<= -1)){
+							//content += "<a href='#searchMap' onclick='searchSpotMap(\""+title+"\")'>"+description + "</a>";
+							content +='<a href="#searchMap"  onclick="searchSpotMap(\''+title+'\',\''+date+'\',\''+description+'\',\''+lat+'\',\''+lng+'\')">'+title+": "+description + "</a>";
+							var resultItem = $("<li>").html(content);
+							$("#searchResults").append(resultItem);
+						}
+					});					
+				}
+				$("#searchResults").listview("refresh");
+			}
+			
+			function updatespots(){
+				$.ajax({
+					url:"http://geoodk.com/app/collect/localspot_xml.php",
+					dataType:"xml",
+					success:listspots
+				});
+			}
+			    function downloadUrl(url, callback) {
+					var request = window.ActiveXObject ?
+					  new ActiveXObject('Microsoft.XMLHTTP') :
+					  new XMLHttpRequest;
+					
+					request.onreadystatechange = function() {
+					if (request.readyState == 4) {
+					  request.onreadystatechange = doNothing;
+					  callback(request, request.status);
+					}
+					};
+					
+					request.open('GET', url, true);
+					request.send(null);
+			}
+			function doNothing() {}
+			
+			function createmapview(){
+				var loca = new google.maps.LatLng(38.987827,-76.942801);
+				var bounds = new google.maps.LatLngBounds();
+				var mapOptions = {
+					zoom:14,
+					mapTypeId: google.maps.MapTypeId.ROADMAP,
+					center: loca
+				}
+				var map2 = new google.maps.Map(document.getElementById('mapViewDiv'),mapOptions);
+				var infoWindow = new google.maps.InfoWindow;
+				 downloadUrl("./map_points.php", function(data) {
+				  var xml = data.responseXML;
+				  var markers = xml.documentElement.getElementsByTagName("spot");
+				  for (var i = 0; i < markers.length; i++) {
+					  
+					var contentString = "<h3>"+markers[i].getAttribute("title")+"</h3>"+"<div>"+markers[i].getAttribute("description")+"</div>";
+					var latlng = new google.maps.LatLng(parseFloat(markers[i].getAttribute("lat")),parseFloat(markers[i].getAttribute("lng")));
+					var marker = new google.maps.Marker({position: latlng, map: map2});
+					bounds.extend(latlng);
+					bindInfoWindow(marker, map2, infoWindow, contentString);
+				   }
+				 });
+				 //alert(markerarray.length);
+				
+				
+				google.maps.event.addListenerOnce(map2, 'idle', function() {	
+					google.maps.event.trigger(map2, 'resize');
+					map2.fitBounds(bounds);	
+					//map2.setZoom(14);	
+				});
+
+				
+			}
+			    function bindInfoWindow(marker, map, infoWindow, html) {
+				  google.maps.event.addListener(marker, 'click', function() {
+					infoWindow.setContent(html);
+					infoWindow.open(map, marker);
+				  });
+				}
+			
+			function searchSpotMap(title, date, description, lat, lng){
+				var size = $('body').height().toString() +'px';
+				$('#searchMapContent').css('height',size);
+				var loca = new google.maps.LatLng(parseFloat(lat),parseFloat(lng));
+				var bounds = new google.maps.LatLngBounds();
+				var mapOptions = {
+					zoom:10,
+					mapTypeId: google.maps.MapTypeId.ROADMAP,
+					center: loca
+				}
+				if(!map3){
+					map3 = new google.maps.Map(document.getElementById('searchMapViewDiv'),mapOptions);
+				}else{
+					map3 = null;
+					map3 = new google.maps.Map(document.getElementById('searchMapViewDiv'),mapOptions);
+				}
+				var contentString = '<h3>'+title+'</h3>'+
+								  '<div>'+description+'</div>';
+				  var infowindow = new google.maps.InfoWindow({
+					  content: contentString
+				  });
+				bounds.extend(loca);
+				var marker = new google.maps.Marker({
+
+					draggable:true,
+					animation: google.maps.Animation.DROP,
+					position: loca
+				  });
+				  marker.setMap(map3);
+				  
+				google.maps.event.addListener(marker, 'click', function() {
+					infowindow.open(map3,marker);
+				 });
+				google.maps.event.addListenerOnce(map3, 'idle', function() {	
+					google.maps.event.trigger(map3, 'resize');
+					map3.fitBounds(bounds);	
+					map3.setZoom(16);	
+				});
+				
+			}
+			
+			
+			
+			//$(document).on("pageinit", init);
+			
+			$(document).on("pageinit","#create",function(){
+				
+				if( /Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent) ) {
+					showLocation_mobile();
+				// some code..
+				}else{
+					if(navigator.geolocation){
+					    navigator.geolocation.getCurrentPosition(showLocation,doNothing,{enableHighAccuracy:true});
+					}else{
+						alert("Geolocation not supported in this device");
+						return;
+					}
+				}
+				$( "#category" ).change(function() {
+				  if($('#category').val()=='Other'){
+					  $('#other_cat_div').css("display", 'block');
+				  }else{
+						 $('#other_cat_div').css("display", 'none'); 
+				  }					  
+				});
+					
+
+			});
+			
+			
+			$(document).on("pageinit","#search",function(){
+					updatespots();
+			});
+			
+			$(document).on("pageinit","#mapView",function(){
+					createmapview();
+			});
+			$(window).resize(function(){
+			  				  var size = $('body').height().toString() +'px';
+				$('#searchMapContent').css('height',size);
+				$('#MapViewContent').css('height',size);
+			});
+			
+			$( document ).ready(function() {
+				$(function() {
+				  setTimeout(hideSplash, 2000);
+				});
+				
+				function hideSplash() {
+				  $.mobile.changePage("#index", "fade");
+				}
+			  var size = $('body').height().toString() +'px';
+				$('#searchMapContent').css('height',size);
+				$('#MapContent').css('height','300px');
+				$('#MapViewContent').css('height',size);
+				
+			});
+
+		</script>
+        
+        			
+	</head>
+	<body>
+    
+    	<!-- Index Page ----------------------------------------------------------------------------------------------->
+        <div data-role="page" data-theme="b" id="splash" style="background-color: #fff;"> 
+            <div class="splash" align="center" style="margin:auto; position:absolute;bottom: 0;left: 0;top: 40%;right: 0;">
+                <img src="./images/splash_geoodk.png" alt="splash" />
+            </div>
+        </div>
+		<div data-role="page" id="index" data-theme="a">
+			<div data-role="header" data-position="inline">
+            	<a href="#index" data-icon="geoodk_logo" data-iconpos="notext">Home</a>
+				<h1>A Local Spot</h1>
+			</div>
+			<div data-role="content" data-theme="a">
+            <!--<img src="images/logo2_web.png" />-->
+            <div data-role="controlgroup">
+                <a style="text-align:left;" data-icon="plus" data-role="button" href="#create">Create</a>
+                <a style="text-align:left;" data-icon="search" data-role="button" href="#search">Search</a>
+                <a style="text-align:left;" data-icon="grid" data-role="button" href="#mapView">Map</a>
+                <a style="text-align:left;" data-icon="star" data-role="button" href="#share">Share</a>
+			</div>
+				
+			</div>
+             <div data-role="footer" data-position="fixed" id="footer1">
+                <div data-role="navbar">
+                    <ul>
+                        <li><a href="#about" data-role="button" data-icon="info">About</a></li>
+                        
+                    </ul>
+                </div>
+			</div>	
+		</div>
+        
+        
+        <!--------------------------------------------------------------------------------------------------------- -->
+        <div data-role="page" id="about">
+            <div data-role="header" data-position="fixed" id="header1">
+                <a href="#index" data-icon="geoodk_logo" data-iconpos="notext">Home</a>
+                <h1>About Local Spots</h1>
+            </div>
+            <div data-role="content">
+            <h2>Introduction</h2>
+            <p>In the last year I have been building a geographical open community that is a combination of software, tools, blogs, and ODK Collect plugins. This was prompted by increase in agricultural crop monitoring, and field data collection research at the University of Maryland.  During the process of developing some of these tools I needed “dummy data”, data that is merely for test purposes. I decided to title this data “A Local Spot”. A place that a user considers local or a places (current location) worth sharing. Thus far the data has been collected using ODK Collect and mapping in ArcGis. I am proposing to create an application using HTML5, CSS, JavaScript, jQuery and Google Maps API. Then using phoneGap to create the application as a native app for Android. </p>
+            <p>
+            This application is target to users that are looking for a fun location or want sharing a location of interests. Often we find ourselves searching for something to do, mainly on the Internet or googling. The application will not be user specific at this stage. With user increase, or if the application is made public, authentication will be mandatory. I did a quick search of “local spots” in the app store and found nothing in the top 10 applications other than google maps app and a random yahoo application. When the project concludes I plan to putting this app on the google play store. If anything I will use it for my own purposes in other projects. 
+            </p>
+            <h2>Data description </h2>
+            <p>
+            The only data that will be used for this application is a table of local spots collected using ODK Collect over the last year. Mainly, this application will be used to collect and view its own data. The PHP files for this application will have to be stored on a server because PhoneGap will not handle it. Luckily PhoneGap it capable with XmlHTTPRequest and GET, POST and ajax requests. 
+
+The application will use the gps of the device to record the location and then stored in the database. Specifically the locational information will be used for mapping and searching. The data will be stored in one main table however other tables will be used for referencing and joining through SQL.
+
+            </p>
+            <h2>System Description </h2>
+            <p>The application will use a custom theme developed in the jQuery themer http://jquerymobile.com/themeroller/  tool, a drag and click web app for creating themes. I will use the GeoODK colors and powered by logo. This application will need to use best practice methods and api standard. The search function will require SQL statements and query logic. 
+ 
+The way the application works is the home page will start with the options to Create, Search, Map and Share. The Create page will be a form to collect the Location, Category, Description, and Image. There you will submit the data to the server and PHP will handle the data to insert it into the database. From there XML pages generated by PHP will reflect the data stored in the database. The search page will make XmlHTTPRequest to get “local spots” near the users location The map will be a Google Map view of the data, also using XmlHTTPRequest to display the points. For each of the Local Spot nodes a page will be dynamicly page with be populated showing the detail information and location information. From that page direction can be displayed. Finally, the Share page will be a advertisement page where the user can share the application with it friends. </p>
+
+		<h2>Implementation & Results </h2>
+        <p>The files for this application will consists HTML, PHP, dynamic XML, JavaScript, jQuery, and CSS. Once the application is written and tested I will convert the application using the PhoneGap API to create a native application using Android Java SDK. I have a Samsung Galaxy S3 that will be used for testing.  Below is a diagram of the different pages and logic workflow. One of the crucial components of this project is the interaction between the database/SQL and jQuery ajax’s.</p>
+		<img src="images/pan_image.png" width="100%">
+<h2>Conclusion  </h2>
+        <p>This application encompasses all of the main stream web computer languages, and will be a good reflection of what we have learned in this class. The data gathered by this application will serve as an excellent data mapping feed for future tool create by GeoODK. Using PhoneGap will be a new experience and great opportunity to learn it. The application will be called “Local Spot”.</p>
+            </div>
+            <div data-role="footer" data-position="fixed" id="footer1">
+                <div data-role="navbar">
+                    <ul>
+                        <li><a href="#index" data-role="button" data-icon="home">Home</a></li>
+                        <li><a href="#share" data-role="button" data-icon="star">Share</a></li>
+                        
+                    </ul>
+                </div>
+			</div>	
+		</div>
+        
+        <!--  Create Page --------------------------------------------------------------------------------------------- -->
+        
+        
+        <div data-role="page" id="create" data-theme="a">
+			<div data-role="header" data-position="inline">
+            	<a href="#index" data-icon="geoodk_logo" data-iconpos="notext">Home</a>
+				<h1>Create</h1>
+			</div>
+			<div data-role="content" data-theme="a">
+            <div>Create A Local Spot</div>
+			<form method="post" id="insertForm" onSubmit="javascript:validateFormOnSubmit()">
+            	<label for="category"><b>Category:</b></label>
+                <select id="category" name="category">
+                	<option value="none">--Select A Category--</option>
+                	<option value="Bar">Bar</option>
+                    <option value="Restaurant">Restaurant</option>
+                    <option value="Park">Park</option>
+                    <option value="Business">Business</option>
+                    <option value="Monument">Monument</option>
+                    <option value="Museum">Museum</option>
+                    <option value="Music">Music</option>
+                    <option value="Other">Other</option>                    
+                </select>
+                
+                <div id="other_cat_div" style="display:none;">
+                <label for="other_cat" class="ui-hidden-accessible"></label>
+                <input type="text" id="other_cat" name="other_cat" value="" placeholder="Enter in a new Category" />
+                </div>   
+                
+                <div data-role="fieldcontain">
+                <label for="title"><b>Title</b></label> 
+                <input type="text" id="title" name="title" value="" />
+                </div>
+                
+                <div data-role="fieldcontain">
+                <label for="description"><b>Description</b></label> 
+                <textarea name="description" id="description"></textarea>
+                </div>
+                
+        
+                <fieldset class="ui-grid-a">
+                <div class="ui-block-a"><label for="lat"><b>Latitude</b></label></div>
+                <div class="ui-block-b"><label for="lng"><b>Longitude</b></label></div>
+                
+                <div class="ui-block-a"><input type="number" name="lat" id="lat" placeholder="Enter the latidue" min="-90" max="90" step="0.000001" /></div>
+                <div class="ui-block-b"><input type="number" name="lng" id="lng" placeholder="Enter the longitude" min="-180" max="180" step="0.000001" /></div>
+                
+                </fieldset>
+                <div data-role="fieldcontain">
+                	<label for="address"><b>Address</b></label> 
+                    <input type="text" name="address" id="address" />
+                
+                </div>
+                
+                <div id="MapContent">
+					<div data-role="content" id="mapDiv" style="width:100%;height:100%"></div>
+				</div>
+             
+                <fieldset class="ui-grid-a">
+                	<div class="ui-block-a"><a href="#homeView" id="cancel" data-role="button">Cancel</a></div>
+                    <div class="ui-block-b"><button id="submit" data-role="button">Submit</button></div>
+                </fieldset>
+                
+                <h3 id="message"></h3>
+   
+            </form> 
+            
+               
+			</div>
+             <div data-role="footer" data-position="fixed" id="footer1">
+                <div data-role="navbar">
+                    <ul>
+                    	<li><a href="#index" data-role="button" data-icon="home">Home</a></li>	
+                        <li><a href="#mapView" data-role="button" data-icon="grid">Map</a></li>	
+                        <li><a href="#search" data-role="button" data-icon="search">Search</a></li>
+                    </ul>
+                </div>
+			</div>	
+		</div>
+        
+        
+         <!--------------------------------------------------------------------------------------------------------- -->
+         <!---------  Search page------------------------------------------------------------------------------------------- -->
+         <div data-role="page" id="search">
+            <div data-role="header" data-position="fixed" id="header1">
+                <a href="#index" data-icon="geoodk_logo" data-iconpos="notext">Home</a>
+                <h1>Search</h1>
+            </div>
+            <div data-role="content">	
+                <ul id="searchResults" data-inset="true" data-role="listview">
+           
+                    
+                </ul>
+            </div>
+            <div data-role="footer" data-position="fixed" id="footer1">
+                <div data-role="navbar">
+                    <ul>
+                    	<li><a href="#index" data-role="button" data-icon="home">Home</a></li>	
+                        <li><a href="#create" data-role="button" data-icon="plus">Create</a></li>	
+                        <li><a href="#mapView" data-role="button" data-icon="grid">Map</a></li>
+                    </ul>
+                </div>
+			</div>	
+		</div>
+        
+        <div data-role="page" id="searchMap">
+            <div data-role="header" data-position="fixed" id="header1">
+                    <a href="#search" data-icon="back" data-iconpos="notext">Map</a>
+                    <h1>A Local Spots</h1>
+            </div>  
+            <div id="searchMapContent">
+            	<div data-role="content" id="searchMapViewDiv" style="width:100%;height:100%"></div>            
+            </div>
+        </div>
+     
+        
+        <!--------------------------------------------------------------------------------------------------------- -->
+        <div data-role="page" id="mapView">
+            <div data-role="header" data-position="fixed" id="header1">
+                <a href="#index" data-icon="geoodk_logo" data-iconpos="notext">Map</a>
+                <h1>Map</h1>
+            </div>
+                     
+            <div id="MapViewContent" >
+                <div data-role="content" id="mapViewDiv" style="width:100%;height:100%"></div>
+            </div>
+            
+		</div>	
+        
+        <!--------------------------------------------------------------------------------------------------------- -->
+          <div data-role="page" id="share">
+            <div data-role="header" data-position="fixed" id="header1">
+                <a href="#index" data-icon="geoodk_logo" data-iconpos="notext">Home</a>
+                <h1>Share A Local Spots</h1>
+            </div>
+                     
+            <div id="share_div" data-role="content" >
+                <ul data-role="listview" data-inset="true">
+                    <li><a href="https://www.facebook.com/jon.nordling.3" target="_blank"><img class="share_img" src="images/facebook.png">Share on Facebook</a></li>
+                    <li><a href="https://twitter.com/jonnordling" target="_blank"><img class="share_img" src="images/twitter.png">Share on Twitter</a></li>
+                    <li><a href="http://www.linkedin.com/profile/view?id=155113151" target="_blank"><img class="share_img" src="images/linkedin.png">Share on Linkedin</a></li>
+                    <li><a href="https://plus.google.com/u/0/103929672596638809613" target="_blank"><img class="share_img" src="images/gplus.png">Share on Google+</a></li>
+                    <li><a href="mailto:jonnordling@gmail.com" target="_blank"><img class="share_img" src="images/email.png">Share by Email</a></li>
+                </ul>
+            </div>
+            
+             <div data-role="footer" data-position="fixed" id="footer1">
+                <div data-role="navbar">
+                    <ul>
+                        <li><a href="#index" data-role="button" data-icon="home">Home</a></li>
+                        <li><a href="#about" data-role="button" data-icon="info">About</a></li>
+                        
+                    </ul>
+                </div>
+			</div>	
+            
+		</div>	
+	</body>
+</html>
